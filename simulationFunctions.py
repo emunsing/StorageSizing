@@ -40,7 +40,7 @@ def createABMatrices( Length, delta_t, eff_in, eff_out, P_min, P_max, E_min, E_m
     # Control variable x:
     # X: [h, e_1....e_N, c_1...c_N, d_1...d_N]
 
-    print('Length = %s' % Length)
+    # print('Length = %s' % Length)
     sys.stdout.flush()
 
     E_init = 0
@@ -158,11 +158,11 @@ def createABMatrices( Length, delta_t, eff_in, eff_out, P_min, P_max, E_min, E_m
     #disp('Inequality Constraints Complete; Running linprog...');
     
     #print('Size of C    (aka c): %s ' % C.shape)
-    print('Size of A    (aka G): %s x %s' % A.shape)
-    print('Size of b    (aka h): %s x %s' % b.shape)
-    print('Size of A_eq (aka A): %s x %s' % A_eq.shape)
-    print('Size of B_eq (aka b): %s x %s' % B_eq.shape)
-    sys.stdout.flush()
+    # print('Size of A    (aka G): %s x %s' % A.shape)
+    # print('Size of b    (aka h): %s x %s' % b.shape)
+    # print('Size of A_eq (aka A): %s x %s' % A_eq.shape)
+    # print('Size of B_eq (aka b): %s x %s' % B_eq.shape)
+    # sys.stdout.flush()
     
     return (A, b, A_eq, B_eq)
 
