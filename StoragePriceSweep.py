@@ -24,9 +24,9 @@ import warnings
 warnings.simplefilter(action = "ignore", category = FutureWarning)
 
 
-# fname = "inputData/pricedata_LMP.csv" # FULL
-# fname = "inputData/pricedata_LMP_100.csv" # Only 100 nodes
-fname = "inputData/pricedata_LMP_5.csv" # Only 5 nodes
+fname = "inputData/pricedata_LMP.csv" # FULL
+#fname = "inputData/pricedata_LMP_100.csv" # Only 100 nodes
+#fname = "inputData/pricedata_LMP_5.csv" # Only 5 nodes
 
 APNode_Prices = pd.read_csv( fname, header=0,index_col=0)#,nrows=10)
 APNode_Prices.columns = pd.DatetimeIndex(APNode_Prices.columns,tz=dateutil.tz.tzutc())  # Note: This will be in UTC time. Use .tz_localize(pytz.timezone('America/Los_Angeles')) if a local time zone is desired- but note that this will 
@@ -48,8 +48,8 @@ def computePriceSweep(thisSlice):
     myLength = thisSlice.shape[1]
 
     # Simulation parameters - set these!
-    storagePriceSet = np.arange(1.0,20.1,0.1)
-    storagePriceSet = np.arange(1.0,3.1,1)
+    storagePriceSet = np.arange(1.0,20.1,0.25)
+#    storagePriceSet = np.arange(1.0,3.1,1)
     eff_round = 0.9  # Round-trip efficiency
     E_min = 0
     E_max = 1
@@ -117,16 +117,16 @@ def computePriceSweep(thisSlice):
     return results
 
 ## CUSTOM START/END DATE
-startDate = parser.parse('01/01/12 00:00')  # year starts at 2013-01-01 00:00:00
-endDate = parser.parse('01/31/12 23:00')  # year ends at 2013-12-31 23:00:00
-startDate = pytz.timezone('America/Los_Angeles').localize(startDate).astimezone(pytz.utc)
-endDate = pytz.timezone('America/Los_Angeles').localize(endDate).astimezone(pytz.utc)
+#startDate = parser.parse('01/01/12 00:00')  # year starts at 2013-01-01 00:00:00
+#endDate = parser.parse('12/31/12 23:00')  # year ends at 2013-12-31 23:00:00
+#startDate = pytz.timezone('America/Los_Angeles').localize(startDate).astimezone(pytz.utc)
+#endDate = pytz.timezone('America/Los_Angeles').localize(endDate).astimezone(pytz.utc)
 
 # ## FULL DATASET
-# startDate = APNode_Prices.columns.values[ 0].astype('M8[m]').astype('O') # Convert to datetime, not timestamp
-# endDate   = APNode_Prices.columns.values[-1].astype('M8[m]').astype('O')
-# startDate = pytz.utc.localize(startDate)
-# endDate   = pytz.utc.localize(endDate)
+startDate = APNode_Prices.columns.values[ 0].astype('M8[m]').astype('O') # Convert to datetime, not timestamp
+endDate   = APNode_Prices.columns.values[-1].astype('M8[m]').astype('O')
+startDate = pytz.utc.localize(startDate)
+endDate   = pytz.utc.localize(endDate)
 
 timespan = relativedelta.relativedelta(endDate +timestep, startDate)
 simulationYears = timespan.years + timespan.months/12. + timespan.days/365. + timespan.hours/8760.  # Leap years will be slightly more than a year, and that's ok.
@@ -162,3 +162,4 @@ cycleDf  = joinedResults.loc[(slice(None),'kwhPassed'),:].reset_index(level=1,dr
 sizeDf.to_csv('Data/VaryingPrices_StorageSizing_v2.csv')
 profitDf.to_csv('Data/VaryingPrices_StorageProfits_v2.csv')
 cycleDf.to_csv('Data/VaryingPrices_StorageCycles_v2.csv')
+print("All done!")
