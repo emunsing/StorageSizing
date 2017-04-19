@@ -9,7 +9,7 @@ from datetime import *
 import dateutil
 from dateutil import parser, relativedelta
 import pytz
-import sys, os
+import sys, os, pickle
 
 
 from simulationFunctions import *
@@ -17,6 +17,7 @@ from simulationFunctions import *
 import sys  # This is necessary for printing updates within a code block, via sys.stdout.flush()
 import time # Use time.sleep(secs) to sleep a process if needed
 
+print("Running Storage Efficiency sweep")
 print("Current environment directory:" + sys.prefix)
 print("System version: "+sys.version)
 
@@ -29,6 +30,7 @@ try:
 except KeyError:
     fname = "inputData/pricedata_LMP_100.csv" # Only 100 nodes    
 
+print("Running Storage Efficiency sweep with input file "+fname)
 APNode_Prices = pd.read_csv( fname, header=0,index_col=0)#,nrows=10)
 APNode_Prices.columns = pd.DatetimeIndex(APNode_Prices.columns,tz=dateutil.tz.tzutc())  # Note: This will be in UTC time. Use .tz_localize(pytz.timezone('America/Los_Angeles')) if a local time zone is desired- but note that this will 
 timestep = relativedelta.relativedelta(APNode_Prices.columns[2],APNode_Prices.columns[1])
@@ -148,12 +150,24 @@ startNode = 0
 
 try:
     stopNode = int(os.environ['STOPNODE'])
-    print(stopNode)
 except KeyError:
     stopNode  = 15 # if set to zero, then will loop through all nodes
 
 if ((stopNode == 0)|(stopNode > APNode_Prices.shape[0])): stopNode = APNode_Prices.shape[0]
 thisSlice = APNode_Prices.ix[startNode:stopNode,startDate:endDate]
+
+nodeList = thisSlice.index.values
+
+try:  # If we've saved a pickled file of the nodes that we want to hang onto
+    nodesFromFile = os.environ['NODELIST']
+    if nodesFromFile:
+        with open('nodeList.pkl','rb')as f:
+            nodeList = pickle.loads(f.read())
+except (KeyError, IOError):
+    pass
+
+thisSlice = APNode_Prices.ix[nodeList,startDate:endDate]
+print("Working with a slice of data with %s nodes from %s to %s"%(thisSlice.shape[0],thisSlice.columns.values[0],thisSlice.columns.values[-1]))
 
 import multiprocessing
 
