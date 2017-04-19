@@ -11,3 +11,4 @@ Data
 .env3
 .exportvars
 nohup.out
+.pyc
