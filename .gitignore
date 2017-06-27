@@ -1,3 +1,7 @@
+.gitignore
+.DS_Store
+.save
+.pyc
 inputData
 inputData/
 env/
@@ -11,4 +15,3 @@ Data
 .env3
 .exportvars
 nohup.out
-.pyc
