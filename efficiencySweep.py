@@ -1,5 +1,6 @@
 from cylp.cy import CyClpSimplex
 from cylp.py.modeling.CyLPModel import CyLPArray
+import multiprocessing
 
 import pandas as pd
 import numpy as np
@@ -25,6 +26,7 @@ import warnings
 warnings.simplefilter(action = "ignore", category = FutureWarning)
 
 
+####### LOAD DATA ###############
 try:
     fname = os.environ['INPUTFILE']
 except KeyError:
@@ -33,8 +35,6 @@ except KeyError:
 print("Running Storage Efficiency sweep with input file "+fname)
 APNode_Prices = pd.read_csv( fname, header=0,index_col=0)#,nrows=10)
 APNode_Prices.columns = pd.DatetimeIndex(APNode_Prices.columns,tz=dateutil.tz.tzutc())  # Note: This will be in UTC time. Use .tz_localize(pytz.timezone('America/Los_Angeles')) if a local time zone is desired- but note that this will 
-timestep = relativedelta.relativedelta(APNode_Prices.columns[2],APNode_Prices.columns[1])
-delta_T = timestep.hours  # Time-step in hours
 
 ## Deal with NaN prices
 # Drop nodes which are above a cutoff
@@ -47,14 +47,23 @@ sys.stdout.flush()
 
 def efficiencySweep(thisSlice):
     # Simulation parameters
-    # myEfficiencies = [0.6,0.8,0.9]
 
     pid = multiprocessing.current_process().pid
     myEfficiencies = np.arange(0.4,1.01,0.02)
     reservoirSize=1
     E_min = 0
     E_max = 1
-    # The 1-hour system will be SOC constrained, rather than power constrained. We accordingly don't worry about P_max and P_min
+
+
+    timestep = relativedelta.relativedelta(thisSlice.columns[2],thisSlice.columns[1])
+    delta_T = timestep.hours  # Time-step in hours
+    startDate = thisSlice.columns.values[ 0].astype('M8[m]').astype('O') # Convert to datetime, not timestamp
+    endDate   = thisSlice.columns.values[-1].astype('M8[m]').astype('O')
+    startDate = pytz.utc.localize(startDate)
+    endDate   = pytz.utc.localize(endDate)
+    timespan = relativedelta.relativedelta(endDate +timestep, startDate)
+    simulationYears = timespan.years + timespan.months/12. + timespan.days/365. + timespan.hours/8760.  # Leap years will be slightly more than a year, and that's ok.
+
 
     lastEfficiency = 0  # This is used to track whether the efficiency has switched
     storagePrice = 0 * simulationYears # Amortized cost of storage
@@ -92,6 +101,10 @@ def efficiencySweep(thisSlice):
         energyPrice = thisSlice.loc[myNodeName,:] / 1000.0 # Price $/kWh as array
         c = np.concatenate([[storagePrice],[0]*(myLength+1),energyPrice,energyPrice],axis=0)  # No cost for storage state; charged for what we consume, get paid for what we discharge
         c_clp = CyLPArray(c)
+        print(type(x_var))
+        print(type(c_clp))
+        sys.stdout.flush()
+
         model.objective = c_clp * x_var
 
         for eff_round in myEfficiencies:
@@ -101,9 +114,18 @@ def efficiencySweep(thisSlice):
                     model.removeConstraint('equalities')
                 except:
                     pass
+
+                try:
+                    model.removeConstraint('powermax')
+                except:
+                    pass
                 (eff_in, eff_out) = [np.sqrt(eff_round)] *2  # Properly account for the round trip efficiency of storage
+                P_max = E_max/eff_in # Max charge power, e.g max limit for C_i
+                P_min = -1*E_max*eff_out # Max discharge power, e.g. min D_i
                 (A_eq, b_eq) = createABeq(myLength, delta_T, eff_in, eff_out)
+                (A_P, b_p)   = createPowerConstraint(myLength, P_min, P_max)
                 model.addConstraint(A_eq * x_var == b_eq.toarray(),'equalities')
+                model.addConstraint(A_P  * x_var <= b_p,'powermax')
 
             model.primal()  # Solve
 
@@ -127,7 +149,10 @@ def efficiencySweep(thisSlice):
     return (results,powerOut,pid)
 
 ## CUSTOM START/END DATE
-startDate = parser.parse('01/01/12 00:00')  # year starts at 2013-01-01 00:00:00
+try:
+    startDate=parser.parse(os.environ['STARTDATE'])
+except KeyError:
+    startDate=parser.parse('01/01/12 00:00') # year starts at 2013-01-01 00:00:00
 
 try:
     endDate=parser.parse(os.environ['ENDDATE'])
@@ -143,10 +168,14 @@ endDate = pytz.timezone('America/Los_Angeles').localize(endDate).astimezone(pytz
 # startDate = pytz.utc.localize(startDate)
 # endDate   = pytz.utc.localize(endDate)
 
+timestep = relativedelta.relativedelta(APNode_Prices.columns[2],APNode_Prices.columns[1])
 timespan = relativedelta.relativedelta(endDate +timestep, startDate)
 simulationYears = timespan.years + timespan.months/12. + timespan.days/365. + timespan.hours/8760.  # Leap years will be slightly more than a year, and that's ok.
 
-startNode = 0
+try:
+    startNode = int(os.environ['STARTNODE'])
+except KeyError:
+    startNode  = 0 # if set to zero, then will loop through all nodes
 
 try:
     stopNode = int(os.environ['STOPNODE'])
@@ -169,38 +198,39 @@ except (KeyError, IOError):
 thisSlice = APNode_Prices.ix[nodeList,startDate:endDate]
 print("Working with a slice of data with %s nodes from %s to %s"%(thisSlice.shape[0],thisSlice.columns.values[0],thisSlice.columns.values[-1]))
 
-import multiprocessing
+(results,powerOut,pid) = efficiencySweep(thisSlice)
 
-# Split dataset into roughly even chunks
-j = min(multiprocessing.cpu_count(),10)
-# chunksize = (APNode_Prices.shape[0]/j)+1
-# splitFrames = [df for g,df in APNode_Prices.groupby(np.arange(APNode_Prices.shape[0])//chunksize)]
-chunksize = (thisSlice.shape[0]/j)+1
-splitFrames = [df for g,df in thisSlice.groupby(np.arange(thisSlice.shape[0])//chunksize)]
+print results
+results.to_csv('Data/temp.csv')
 
-print("Entering the pool... bye-bye!")
-solverStartTime = time.time()
+# # Split dataset into roughly even chunks
+# j = min(multiprocessing.cpu_count(),10)
+# chunksize = (thisSlice.shape[0]/j)+1
+# splitFrames = [df for g,df in thisSlice.groupby(np.arange(thisSlice.shape[0])//chunksize)]
 
-pool = multiprocessing.Pool(processes = j)
-resultList = pool.map(efficiencySweep,splitFrames) # Each worker returns a tuple of (result,PowerOut,pid)
+# print("Entering the pool... bye-bye!")
+# solverStartTime = time.time()
 
-(resultFrames, powerOutputs, pids) = zip(*resultList)
+# pool = multiprocessing.Pool(processes = j)
+# resultList = pool.map(efficiencySweep,splitFrames) # Each worker returns a tuple of (result,PowerOut,pid)
 
-results = pd.concat(resultFrames).sort_index()
-powerResults = pd.concat(powerOutputs).sort_index()
+# (resultFrames, powerOutputs, pids) = zip(*resultList)
 
-profitDf = results.loc[(slice(None),'storageProfit'),:].reset_index(level=1,drop=True)
-cycleDf  = results.loc[(slice(None),'cycleCount'),:].reset_index(level=1,drop=True)
+# results = pd.concat(resultFrames).sort_index()
+# powerResults = pd.concat(powerOutputs).sort_index()
 
-profitDf.to_csv('Data/kwhValue_step_02.csv')
-cycleDf.to_csv('Data/cycleCount_step_02.csv')
-powerResults.to_csv('Data/powerOutput_90pct.csv')
+# profitDf = results.loc[(slice(None),'storageProfit'),:].reset_index(level=1,drop=True)
+# cycleDf  = results.loc[(slice(None),'cycleCount'),:].reset_index(level=1,drop=True)
 
-for pid in pids:
-    try:
-    	os.remove('Data/efficiencyResults_pid'+str(pid)+'temp.csv')
-        os.remove('Data/efficiencyPower_pid'  +str(pid)+'temp.csv')
-    except OSError:
-        pass  # We probably didn't have enough datapoints to make this relevant
+# profitDf.to_csv('Data/kwhValue_step_02.csv')
+# cycleDf.to_csv('Data/cycleCount_step_02.csv')
+# powerResults.to_csv('Data/powerOutput_90pct.csv')
+
+# for pid in pids:
+#     try:
+#     	os.remove('Data/efficiencyResults_pid'+str(pid)+'temp.csv')
+#         os.remove('Data/efficiencyPower_pid'  +str(pid)+'temp.csv')
+#     except OSError:
+#         pass  # We probably didn't have enough datapoints to make this relevant
 
 print('Total function call time: %.3f seconds' % (time.time() - solverStartTime))
