@@ -1,0 +1,8 @@
+Running Storage Efficiency sweep
+Current environment directory:/home/emunsing/Research/StorageLocation/env
+System version: 2.7.12 (default, Nov 19 2016, 06:48:10) 
+[GCC 5.4.0 20160609]
+Running Storage Efficiency sweep with input file inputData/pricedata_LMP.csv
+Finished Loading Data
+Working with a slice of data with 412 nodes from 2012-01-01T08:00:00.000000000 to 2017-01-01T07:00:00.000000000
+Entering the pool... bye-bye!
