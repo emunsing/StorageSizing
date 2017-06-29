@@ -247,8 +247,12 @@ def createABineq_noPowerConstraint( Length, E_min, E_max):
     # A = [E_1  ; -1* E_1; C_1; -1*C_1; D_1  ; -1*D_1]
     # b = [E_max;  E_min; C_max; C_min; D_max; D_min]
 
+    # Composed as
+    # A = [H_0; E_1; E_2; C_3; D_4]
+    # b = [B_0; B_1; B_2; B_3; B_4]
+
     # H positivity constraints
-    # -h <=0
+    # 0 <= h  or (-h <=0)
     H_0 = sps.hstack([ -1, sps.coo_matrix((1, Length*3+1)) ] )
     B_0 = 0
 
@@ -272,18 +276,13 @@ def createABineq_noPowerConstraint( Length, E_min, E_max):
     B_2 = sps.coo_matrix((Length+1,1))
 
     # Charge Power Constraints
-    # 0 <= c_i    for all i
-    # C max Constraints
+    # 0 <= c_i    for all i   (or -1* c_i <= 0)
     C_3 = -1 * sps.hstack( [ sps.coo_matrix((Length,Length+2)), sps.eye(Length), sps.coo_matrix((Length,Length)) ] )
     #  [h   E_i     C_i    D_i  ]
     #   0  0 0 0 0  1 0 0  0 0 0 ;
     #   0  0 0 0 0  0 1 0  0 0 0 ;
     #   0  0 0 0 0  0 0 1  0 0 0 ];
-    # B_3 = P_max * numpy.ones((Length,1))
-
-    #C Min Constraints
     B_3 = sps.coo_matrix((Length,1))
-
 
     # Discharge Power constraints
     #  d_i <= 0     for all i
@@ -301,6 +300,17 @@ def createABineq_noPowerConstraint( Length, E_min, E_max):
 
     return (A,b)
 
+def createPowerConstraint(Length, P_min, P_max):
+    # Power upper limit- if this is not in place, the system will pass excessive energy during negative price events.
+    C_31 = sps.hstack( [ sps.coo_matrix((Length,Length+2)), sps.eye(Length), sps.coo_matrix((Length,Length)) ] )
+    B_31 = P_max * numpy.ones((Length, 1))
+
+    # Power lower limit- remove if not needed
+    # Pmin <= d_i  or (-d_i <= -Pmin)
+    # D_41 = -1 * D_4
+    # B_41  = -1 * P_min * numpy.ones((Length, 1))
+
+    return (C_31, B_31)
 
 def createABeq( Length, delta_t, eff_in, eff_out):
     # Returns (A_eq, b_eq) matrices s.t. A_eq * x == b at optimality
