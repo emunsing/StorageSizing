@@ -6,7 +6,7 @@ scipy>=0.19.1
 python-dateutil==2.5.3
 pytz==2016.4
 multiprocessing
-cylp>=0.7.3
+#cylp>=0.7.3
 
 # NOTE: REQUIRES cylp>=0.7.3
 # This may need to be built from source

@@ -1,0 +1,7 @@
+export PIP_RESPECT_VIRTUALENV=true
+export INPUTFILE="inputData/pricedata_LMP_100.csv"
+export STARTNODE=0
+export STOPNODE=5
+export STARTDATE="01/01/12 00:00"
+export ENDDATE="01/31/16 23:00"
+export NODELIST=1

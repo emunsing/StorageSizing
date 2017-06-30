@@ -169,7 +169,7 @@ simulationYears = timespan.years + timespan.months/12. + timespan.days/365. + ti
 try:  # If we've saved a pickled file of the nodes that we want to hang onto
     nodesFromFile = os.environ['NODELIST']
     if nodesFromFile:
-        with open('negativeNodeList.pkl','rb')as f:
+        with open('nodeList.pkl','rb')as f:
             nodeList = pickle.loads(f.read())
 except (KeyError, IOError) as e:
     nodeList = APNode_Prices.index.values
@@ -191,12 +191,14 @@ thisSlice = thisSlice.ix[startNode:stopNode,startDate:endDate]
 solverStartTime = time.time()
 
 print("Working with a slice of data with %s nodes from %s to %s"%(thisSlice.shape[0],thisSlice.columns.values[0],thisSlice.columns.values[-1]))
+print(thisSlice.index)
 
 # Split dataset into roughly even chunks
-j = min(multiprocessing.cpu_count(),10)
+j = min(multiprocessing.cpu_count(),10,stopNode-startNode)
 chunksize = (thisSlice.shape[0]/j)+1
 splitFrames = [df for g,df in thisSlice.groupby(np.arange(thisSlice.shape[0])//chunksize)]
 
+print("Master process id: %s on %s workers"%(multiprocessing.current_process().pid,j))
 print("Entering the pool... bye-bye!")
 solverStartTime = time.time()
 
