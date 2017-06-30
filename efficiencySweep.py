@@ -49,7 +49,7 @@ def efficiencySweep(thisSlice):
     # Simulation parameters
 
     pid = multiprocessing.current_process().pid
-    myEfficiencies = np.arange(0.4,1.01,0.02)
+    myEfficiencies = np.arange(0.4,1.01,0.1)
     reservoirSize=1
     E_min = 0
     E_max = 1
@@ -68,7 +68,6 @@ def efficiencySweep(thisSlice):
     lastEfficiency = 0  # This is used to track whether the efficiency has switched
     storagePrice = 0 * simulationYears # Amortized cost of storage
     myLength = thisSlice.shape[1]
-
 
     # Result dataframe: Size, kwhPassed, and profits for each node, at each efficiency (columns)
     resultIndex = pd.MultiIndex.from_product([thisSlice.index,['cycleCount','storageProfit']])
@@ -93,7 +92,6 @@ def efficiencySweep(thisSlice):
     model.addConstraint(h_constant * x_var == reservoirSize,'fixedSize')
     model.addConstraint(         A * x_var <= b.toarray(),  'inequalities')
 
-
     #### LOOP THROUGH nodes
     for i in range(thisSlice.shape[0]):
         # Define cost function
@@ -101,10 +99,6 @@ def efficiencySweep(thisSlice):
         energyPrice = thisSlice.loc[myNodeName,:] / 1000.0 # Price $/kWh as array
         c = np.concatenate([[storagePrice],[0]*(myLength+1),energyPrice,energyPrice],axis=0)  # No cost for storage state; charged for what we consume, get paid for what we discharge
         c_clp = CyLPArray(c)
-        print(type(x_var))
-        print(type(c_clp))
-        sys.stdout.flush()
-
         model.objective = c_clp * x_var
 
         for eff_round in myEfficiencies:
@@ -172,6 +166,15 @@ timestep = relativedelta.relativedelta(APNode_Prices.columns[2],APNode_Prices.co
 timespan = relativedelta.relativedelta(endDate +timestep, startDate)
 simulationYears = timespan.years + timespan.months/12. + timespan.days/365. + timespan.hours/8760.  # Leap years will be slightly more than a year, and that's ok.
 
+try:  # If we've saved a pickled file of the nodes that we want to hang onto
+    nodesFromFile = os.environ['NODELIST']
+    if nodesFromFile:
+        with open('negativeNodeList.pkl','rb')as f:
+            nodeList = pickle.loads(f.read())
+except (KeyError, IOError) as e:
+    nodeList = APNode_Prices.index.values
+thisSlice = APNode_Prices.loc[nodeList,:]
+
 try:
     startNode = int(os.environ['STARTNODE'])
 except KeyError:
@@ -182,55 +185,41 @@ try:
 except KeyError:
     stopNode  = 15 # if set to zero, then will loop through all nodes
 
-if ((stopNode == 0)|(stopNode > APNode_Prices.shape[0])): stopNode = APNode_Prices.shape[0]
-thisSlice = APNode_Prices.ix[startNode:stopNode,startDate:endDate]
+if ((stopNode == 0)|(stopNode > thisSlice.shape[0])): stopNode = thisSlice.shape[0]
+thisSlice = thisSlice.ix[startNode:stopNode,startDate:endDate]
 
-nodeList = thisSlice.index.values
+solverStartTime = time.time()
 
-try:  # If we've saved a pickled file of the nodes that we want to hang onto
-    nodesFromFile = os.environ['NODELIST']
-    if nodesFromFile:
-        with open('nodeList.pkl','rb')as f:
-            nodeList = pickle.loads(f.read())
-except (KeyError, IOError):
-    pass
-
-thisSlice = APNode_Prices.ix[nodeList,startDate:endDate]
 print("Working with a slice of data with %s nodes from %s to %s"%(thisSlice.shape[0],thisSlice.columns.values[0],thisSlice.columns.values[-1]))
 
-(results,powerOut,pid) = efficiencySweep(thisSlice)
+# Split dataset into roughly even chunks
+j = min(multiprocessing.cpu_count(),10)
+chunksize = (thisSlice.shape[0]/j)+1
+splitFrames = [df for g,df in thisSlice.groupby(np.arange(thisSlice.shape[0])//chunksize)]
 
-print results
-results.to_csv('Data/temp.csv')
+print("Entering the pool... bye-bye!")
+solverStartTime = time.time()
 
-# # Split dataset into roughly even chunks
-# j = min(multiprocessing.cpu_count(),10)
-# chunksize = (thisSlice.shape[0]/j)+1
-# splitFrames = [df for g,df in thisSlice.groupby(np.arange(thisSlice.shape[0])//chunksize)]
+pool = multiprocessing.Pool(processes = j)
+resultList = pool.map(efficiencySweep,splitFrames) # Each worker returns a tuple of (result,PowerOut,pid)
 
-# print("Entering the pool... bye-bye!")
-# solverStartTime = time.time()
+(resultFrames, powerOutputs, pids) = zip(*resultList)
 
-# pool = multiprocessing.Pool(processes = j)
-# resultList = pool.map(efficiencySweep,splitFrames) # Each worker returns a tuple of (result,PowerOut,pid)
+results = pd.concat(resultFrames).sort_index()
+powerResults = pd.concat(powerOutputs).sort_index()
 
-# (resultFrames, powerOutputs, pids) = zip(*resultList)
+profitDf = results.loc[(slice(None),'storageProfit'),:].reset_index(level=1,drop=True)
+cycleDf  = results.loc[(slice(None),'cycleCount'),:].reset_index(level=1,drop=True)
 
-# results = pd.concat(resultFrames).sort_index()
-# powerResults = pd.concat(powerOutputs).sort_index()
+profitDf.to_csv('Data/kwhValue_step_02.csv')
+cycleDf.to_csv('Data/cycleCount_step_02.csv')
+powerResults.to_csv('Data/powerOutput_90pct.csv')
 
-# profitDf = results.loc[(slice(None),'storageProfit'),:].reset_index(level=1,drop=True)
-# cycleDf  = results.loc[(slice(None),'cycleCount'),:].reset_index(level=1,drop=True)
-
-# profitDf.to_csv('Data/kwhValue_step_02.csv')
-# cycleDf.to_csv('Data/cycleCount_step_02.csv')
-# powerResults.to_csv('Data/powerOutput_90pct.csv')
-
-# for pid in pids:
-#     try:
-#     	os.remove('Data/efficiencyResults_pid'+str(pid)+'temp.csv')
-#         os.remove('Data/efficiencyPower_pid'  +str(pid)+'temp.csv')
-#     except OSError:
-#         pass  # We probably didn't have enough datapoints to make this relevant
+for pid in pids:
+    try:
+    	os.remove('Data/efficiencyResults_pid'+str(pid)+'temp.csv')
+        os.remove('Data/efficiencyPower_pid'  +str(pid)+'temp.csv')
+    except OSError:
+        pass  # We probably didn't have enough datapoints to make this relevant
 
 print('Total function call time: %.3f seconds' % (time.time() - solverStartTime))
