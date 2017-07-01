@@ -6,8 +6,8 @@ scipy>=0.19.1
 python-dateutil==2.5.3
 pytz==2016.4
 multiprocessing
-#cylp>=0.7.3
 
-# NOTE: REQUIRES cylp>=0.7.3
-# This may need to be built from source
+# NOTE: REQUIRES cylp>=0.7.3 on Mac
+# Linux: requires cylp>=0.7.2; install with easy_install
+# This may need to be built from source, in which case you will want to start with only numpy and scipy in the environment (otherwise there will be build conflicts)
 # See details at https://github.com/coin-or/CyLP

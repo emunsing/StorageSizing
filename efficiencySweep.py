@@ -49,7 +49,7 @@ def efficiencySweep(thisSlice):
     # Simulation parameters
 
     pid = multiprocessing.current_process().pid
-    myEfficiencies = np.arange(0.4,1.01,0.1)
+    myEfficiencies = np.arange(0.4,1.01,0.025)
     reservoirSize=1
     E_min = 0
     E_max = 1
