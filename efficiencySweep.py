@@ -49,7 +49,7 @@ def efficiencySweep(thisSlice):
     # Simulation parameters
 
     pid = multiprocessing.current_process().pid
-    myEfficiencies = np.arange(0.4,1.01,0.025)
+    myEfficiencies = np.arange(0.4,1.01,0.02)
     reservoirSize=1
     E_min = 0
     E_max = 1
@@ -219,8 +219,9 @@ powerResults.to_csv('Data/powerOutput_90pct.csv')
 
 for pid in pids:
     try:
-    	os.remove('Data/efficiencyResults_pid'+str(pid)+'temp.csv')
-        os.remove('Data/efficiencyPower_pid'  +str(pid)+'temp.csv')
+#    	os.remove('Data/efficiencyResults_pid'+str(pid)+'temp.csv')
+#        os.remove('Data/efficiencyPower_pid'  +str(pid)+'temp.csv')
+	print("no files to remove")
     except OSError:
         pass  # We probably didn't have enough datapoints to make this relevant
 
