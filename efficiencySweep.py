@@ -167,6 +167,7 @@ timespan = relativedelta.relativedelta(endDate +timestep, startDate)
 simulationYears = timespan.years + timespan.months/12. + timespan.days/365. + timespan.hours/8760.  # Leap years will be slightly more than a year, and that's ok.
 
 try:  # If we've saved a pickled file of the nodes that we want to hang onto
+    nodeList = APNode_Prices.index
     nodesFromFile = os.environ['NODELIST']
     if nodesFromFile:
         with open('nodeList.pkl','rb')as f:
@@ -191,7 +192,6 @@ thisSlice = thisSlice.ix[startNode:stopNode,startDate:endDate]
 solverStartTime = time.time()
 
 print("Working with a slice of data with %s nodes from %s to %s"%(thisSlice.shape[0],thisSlice.columns.values[0],thisSlice.columns.values[-1]))
-print(thisSlice.index)
 
 # Split dataset into roughly even chunks
 j = min(multiprocessing.cpu_count(),10,stopNode-startNode)
