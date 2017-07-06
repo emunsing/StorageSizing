@@ -49,7 +49,7 @@ def efficiencySweep(thisSlice):
     # Simulation parameters
 
     pid = multiprocessing.current_process().pid
-    myEfficiencies = np.arange(0.4,1.01,0.02)
+    myEfficiencies = np.arange(0.4,1.01,0.1)
     reservoirSize=1
     E_min = 0
     E_max = 1
@@ -136,7 +136,7 @@ def efficiencySweep(thisSlice):
         # Done with the loop; reverse the efficiency set and move on to the next node
         myEfficiencies = myEfficiencies[::-1]
 
-        if (i+1)%50==0:
+        if (i+1)%2==0:
         	results.to_csv( 'Data/efficiencyResults_pid'+str(pid)+'temp.csv' )
         	powerOut.to_csv('Data/efficiencyPower_pid'  +str(pid)+'temp.csv' )
 
